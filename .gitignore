@@ -1,0 +1,8 @@
+.env
+node_modules/
+discord.ts
+render-*/
+error.json
+debug.json
+src/*.json
+src/commands.ts
