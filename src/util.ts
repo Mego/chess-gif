@@ -1,4 +1,4 @@
-import { PartialRecord, Square, File } from "./types";
+import { PartialRecord, Square, File, Piece, Player, Rank } from "./types";
 
 export const filter_map = <K extends string | number | symbol, V>(
   map: PartialRecord<K, V>,
@@ -21,6 +21,17 @@ export const addFile = (file: File, dist: number): File => {
   }
   return String.fromCharCode(dst) as File;
 };
+
+export const addRank = (rank: Rank, dist: number): Rank => {
+  const numRank = +rank;
+  if (numRank + dist < 1 || numRank + dist > 8) {
+    throw new RangeError(`destination out of bounds: ${rank} ${dist}`);
+  }
+  return `${numRank + dist}` as Rank;
+};
+
+export const addOffset = (square: Square, x: number, y: number): Square =>
+  `${addFile(square[0] as File, x)}${addRank(square[1] as Rank, y)}`;
 
 export const boardDistance = (
   from: Square,

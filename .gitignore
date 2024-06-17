@@ -6,3 +6,8 @@ error.json
 debug.json
 src/*.json
 src/commands.ts
+src/events.ts
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json

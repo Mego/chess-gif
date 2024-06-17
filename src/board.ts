@@ -17,6 +17,7 @@ import {
   isRookMove,
   map_length,
   squaresBetween,
+  addOffset,
 } from "./util";
 
 const default_positions: FullBoardPieces = {
@@ -65,6 +66,151 @@ export class Board {
   constructor(setup: FullBoardPieces = default_positions) {
     this.white_piece_locations = { ...setup.white };
     this.black_piece_locations = { ...setup.black };
+  }
+
+  clone(): typeof this {
+    return new (this.constructor as new (setup: FullBoardPieces) => this)({
+      white: this.white_piece_locations,
+      black: this.black_piece_locations,
+    });
+  }
+
+  threatenedSquaresByPiece(
+    piece: Piece,
+    square: Square,
+    player: Player
+  ): Set<Square> {
+    const opponent_pieces =
+      player === Player.White
+        ? this.black_piece_locations
+        : this.white_piece_locations;
+    const forwardY = player === Player.White ? 1 : -1;
+    const squares = new Set<Square>();
+    switch (piece) {
+      case Piece.Pawn:
+        try {
+          squares.add(addOffset(square, 1, forwardY));
+        } catch {}
+        try {
+          squares.add(addOffset(square, -1, forwardY));
+        } catch {}
+        // ignoring en passant because this is only going to be used for determining checks
+        break;
+      case Piece.Knight:
+        for (const x of [1, 2]) {
+          for (const dx of [-1, 1]) {
+            for (const dy of [-1, 1]) {
+              const y = 3 - x;
+              try {
+                squares.add(addOffset(square, x * dx, y * dy));
+              } catch {}
+            }
+          }
+        }
+        break;
+      case Piece.Bishop:
+        for (const dx of [-1, 1]) {
+          for (const dy of [-1, 1]) {
+            let new_sq = square;
+            do {
+              try {
+                new_sq = addOffset(new_sq, dx, dy);
+                squares.add(new_sq);
+              } catch {
+                break;
+              }
+            } while (opponent_pieces[new_sq] === undefined);
+          }
+        }
+        break;
+      case Piece.Rook:
+        for (const dx of [-1, 1]) {
+          let new_sq = square;
+          do {
+            try {
+              new_sq = addOffset(new_sq, dx, 0);
+              squares.add(new_sq);
+            } catch {
+              break;
+            }
+          } while (opponent_pieces[new_sq] === undefined);
+        }
+        for (const dy of [-1, 1]) {
+          let new_sq = square;
+          do {
+            try {
+              new_sq = addOffset(new_sq, 0, dy);
+              squares.add(new_sq);
+            } catch {
+              break;
+            }
+          } while (opponent_pieces[new_sq] === undefined);
+        }
+        break;
+      case Piece.Queen:
+        for (const dx of [-1, 1]) {
+          for (const dy of [-1, 1]) {
+            let new_sq = square;
+            do {
+              try {
+                new_sq = addOffset(new_sq, dx, dy);
+                squares.add(new_sq);
+              } catch {
+                break;
+              }
+            } while (opponent_pieces[new_sq] === undefined);
+          }
+        }
+        for (const dx of [-1, 1]) {
+          let new_sq = square;
+          do {
+            try {
+              new_sq = addOffset(new_sq, dx, 0);
+              squares.add(new_sq);
+            } catch {
+              break;
+            }
+          } while (opponent_pieces[new_sq] === undefined);
+        }
+        for (const dy of [-1, 1]) {
+          let new_sq = square;
+          do {
+            try {
+              new_sq = addOffset(new_sq, 0, dy);
+              squares.add(new_sq);
+            } catch {
+              break;
+            }
+          } while (opponent_pieces[new_sq] === undefined);
+        }
+        break;
+    }
+    // not considering king because this is only for determining checks, and kings can't deliver checks
+
+    return squares;
+  }
+
+  threatenedSquares(player: Player): Set<Square> {
+    let own_pieces =
+      player === Player.White
+        ? this.white_piece_locations
+        : this.black_piece_locations;
+    const squares = new Set<Square>();
+    (Object.entries(own_pieces) as [Square, Piece][]).forEach(
+      ([square, piece]) => {
+        for (const sq of this.threatenedSquaresByPiece(piece, square, player)) {
+          squares.add(sq);
+        }
+      }
+    );
+
+    return squares;
+  }
+
+  isInCheck(player: Player): boolean {
+    return this.threatenedSquares(
+      player === Player.White ? Player.Black : Player.White
+    ).has(this.getKingPosition(player));
   }
 
   findPieceForMove(move: ParsedMove): Square | null {
@@ -180,6 +326,18 @@ export class Board {
         );
         break;
       }
+    }
+    if (map_length(potential_pieces) > 1) {
+      potential_pieces = filter_map(potential_pieces, (sq, p) => {
+        const newBoard = this.clone();
+        newBoard.doMove({
+          from: sq,
+          player: move.player,
+          to: `${move.to_file}${move.to_rank}`,
+          raw: move.raw,
+        });
+        return !newBoard.isInCheck(move.player);
+      });
     }
     if (map_length(potential_pieces) === 1) {
       return Object.entries(potential_pieces)[0][0] as Square;
